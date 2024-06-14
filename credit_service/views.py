@@ -19,25 +19,10 @@ class RegisterUserView(APIView):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            csv_file = request.FILES['file']  # Assuming the CSV file is sent in the request
-            csv_reader = csv.reader(StringIO(csv_file.read().decode('utf-8')))
-            next(csv_reader)  # Skip the header row
-
-            transactions = []
-            for row in csv_reader:
-                user_id, date, transaction_type, amount = row
-                if user_id == str(user.unique_user_id):
-                    transactions.append(Transaction(
-                        user=user,
-                        date=date,
-                        transaction_type=transaction_type,
-                        amount=Decimal(amount)
-                    ))
-            Transaction.objects.bulk_create(transactions)
-            
-            calculate_credit_score_task.delay(user.unique_user_id)
-            return Response({"unique_user_id": user.unique_user_id}, status=status.HTTP_200_OK)
+            calculate_credit_score_task.delay(user.id)
+            return Response({'unique_user_id': user.id}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ApplyLoanView(generics.CreateAPIView):
     serializer_class = LoanSerializer
