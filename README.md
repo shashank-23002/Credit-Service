@@ -1,4 +1,4 @@
-# BrightMoney Project
+# Credit Service Application
 
 ## Overview
 This project is a Django-based application that handles user registrations, loan applications, EMI payments, and billing processes. It includes various Django models, views, and Celery tasks for background processing.
@@ -139,7 +139,7 @@ CELERY_TIMEZONE = 'UTC'
 }
 ```
 
-**Responset JSON:**
+**Response JSON:**
 ```json
 {
     "aadhar_id": "8bac0a2d-f31a-4fc4-a5d2-2e86b379915b"
@@ -164,7 +164,7 @@ CELERY_TIMEZONE = 'UTC'
 
 ```
 
-**Responset JSON:**
+**Response JSON:**
 ```json
 {
     "loan_id": 1,
@@ -188,7 +188,7 @@ CELERY_TIMEZONE = 'UTC'
 }
 ```
 
-**Responset JSON:**
+**Response JSON:**
 ```json
 {
     "message": "Payment recorded successfully."
@@ -201,6 +201,7 @@ CELERY_TIMEZONE = 'UTC'
 **Method:** GET
 
 **Query Parameters:** loan_id
+**Example:** `api/get-statement/?loan_id=1`
 
 **Request JSON:**
 ```json
@@ -217,7 +218,7 @@ CELERY_TIMEZONE = 'UTC'
 }
 ```
 
-**Responset JSON:**
+**Response JSON:**
 ```json
 {
     "message": "Payment recorded successfully."
