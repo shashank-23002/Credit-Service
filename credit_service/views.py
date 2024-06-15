@@ -1,28 +1,24 @@
 from django.shortcuts import render
-
-# Create your views here.
 from rest_framework import generics, status
 from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import User, Loan , EMI , Transaction, Billing, Payment
 from .serializers import UserSerializer , LoanSerializer
-from .tasks import calculate_credit_score_task
+from .tasks import calculate_credit_score
 from decimal import Decimal
 from datetime import date, timedelta
-import uuid
-import csv
-from io import StringIO
+import json
 
 class RegisterUserView(APIView):
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         serializer = UserSerializer(data=request.data)
+        print(request.data, " Line 20")
         if serializer.is_valid():
-            user = serializer.save()
-            calculate_credit_score_task.delay(user.id)
-            return Response({'unique_user_id': user.id}, status=status.HTTP_200_OK)
+            serializer.save()
+            calculate_credit_score.delay(request.data['aadhar_id'])
+            return Response({'aadhar_id': request.data['aadhar_id']}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ApplyLoanView(generics.CreateAPIView):
     serializer_class = LoanSerializer
@@ -30,13 +26,12 @@ class ApplyLoanView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            user_id = serializer.validated_data['unique_user_id']
             loan_amount = serializer.validated_data['loan_amount']
             interest_rate = serializer.validated_data['interest_rate']
             term_period = serializer.validated_data['term_period']
 
             try:
-                user = User.objects.get(unique_user_id=user_id)
+                user = User.objects.get(aadhar_id=request.data['user_id'])
             except User.DoesNotExist:
                 return Response({"error": "User not found."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -53,30 +48,39 @@ class ApplyLoanView(generics.CreateAPIView):
             if emi_amount is None:
                 return Response({"error": "EMI exceeds 20% of the user's monthly income."}, status=status.HTTP_400_BAD_REQUEST)
 
+
             # Generate EMI schedule
             emi_dates = self.generate_emi_schedule(emi_amount, term_period)
 
+            # Convert Decimal objects to strings
+            loan_amount_str = str(loan_amount)
+
+            # Convert date objects to strings
+            emi_dates_str = [{k: str(v) if isinstance(v, date) else str(v) for k, v in emi_date.items()} for emi_date in emi_dates]
+
             # Create loan
             loan = Loan.objects.create(
-                user=user,
+                user_id=user,
                 loan_type='Credit Card',
-                loan_amount=loan_amount,
+                loan_amount=loan_amount_str,
                 interest_rate=interest_rate,
                 term_period=term_period,
                 disbursement_date=date.today(),
-                emi_dates=emi_dates,
+                emi_dates=json.dumps(emi_dates_str),  # Convert to JSON string
             )
 
-            return Response({"loan_id": loan.loan_id, "due_dates": emi_dates}, status=status.HTTP_200_OK)
+            self.populate_emi_table(loan, emi_dates_str)
+
+            return Response({"loan_id": loan.id, "due_dates": emi_dates_str}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def calculate_emi(self, principal, interest_rate, term_period, annual_income):
-        monthly_income = annual_income / 12
-        rate_per_month = (interest_rate / 100) / 12
+        monthly_income = Decimal(annual_income) / 12
+        rate_per_month = Decimal(interest_rate) / Decimal(100) / 12
         emi = (principal * rate_per_month * (1 + rate_per_month)**term_period) / ((1 + rate_per_month)**term_period - 1)
         
         # Ensure EMI does not exceed 20% of monthly income
-        if emi > monthly_income * 0.2:
+        if emi > monthly_income * Decimal('0.2'):
             return None
         return round(emi, 2)
 
@@ -88,6 +92,15 @@ class ApplyLoanView(generics.CreateAPIView):
             emi_dates.append({"date": emi_date, "amount_due": emi_amount})
         return emi_dates
 
+    def populate_emi_table(self, loan, emi_dates_str):
+        for emi_data in emi_dates_str:
+            EMI.objects.create(
+                loan=loan,
+                date=emi_data['date'],
+                amount_due=emi_data['amount_due'],
+                is_paid=False  # Assuming all EMIs are initially unpaid
+            )
+
 
 class MakePaymentView(APIView):
     def post(self, request, *args, **kwargs):
@@ -96,7 +109,7 @@ class MakePaymentView(APIView):
 
         # Retrieve the loan object
         try:
-            loan = Loan.objects.get(loan_id=loan_id)
+            loan = Loan.objects.get(id=loan_id)
         except Loan.DoesNotExist:
             return Response({"error": "Loan not found."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -144,7 +157,7 @@ class GetStatementView(APIView):
 
         # Retrieve the loan object
         try:
-            loan = Loan.objects.get(loan_id=loan_id)
+            loan = Loan.objects.get(id=loan_id)
         except Loan.DoesNotExist:
             return Response({"error": "Loan not found."}, status=status.HTTP_400_BAD_REQUEST)
 

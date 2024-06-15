@@ -1,21 +1,28 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
 import uuid
 
 class User(models.Model):
-    aadhar_id = models.CharField(max_length=50, unique=True)
-    unique_user_id = models.UUIDField(default=uuid.uuid4, editable=False)
+    aadhar_id = models.CharField(max_length=50, unique=True, blank=True, primary_key=True)
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     annual_income = models.DecimalField(max_digits=10, decimal_places=2)
     credit_score = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if not self.aadhar_id:
+            self.aadhar_id = str(uuid.uuid4())
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
 class Loan(models.Model):
     LOAN_TYPE_CHOICES = [
-        ('CREDIT_CARD', 'Credit Card')
+        ('CREDIT_CARD', 'Credit Card'),
+        ('DEBIT_CARD', 'Debit Card')
     ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, to_field='aadhar_id')
     loan_type = models.CharField(max_length=20, choices=LOAN_TYPE_CHOICES)
     loan_amount = models.DecimalField(max_digits=10, decimal_places=2)
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2)
@@ -23,6 +30,8 @@ class Loan(models.Model):
     disbursement_date = models.DateField()
     principal_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_closed = models.BooleanField(default=False)
+    emi_dates = models.TextField(blank=True, null=True)
+
 
 class EMI(models.Model):
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE)

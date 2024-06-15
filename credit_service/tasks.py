@@ -1,21 +1,21 @@
 from celery import shared_task
-from .models import User, Transaction
-import pandas as pd
+from .models import User
+import csv
 from decimal import Decimal
 from django.conf import settings
-import csv
 
 @shared_task
-def calculate_credit_score_task(user_id):
+def calculate_credit_score(user_id):
     try:
-        user = User.objects.get(unique_user_id=user_id)
+        user = User.objects.get(aadhar_id=user_id)
     except User.DoesNotExist:
         return
 
     # Load CSV transactions for the user
     transactions = load_csv_transactions(user.aadhar_id)
+
     total_balance = sum(
-        transaction.amount if transaction.transaction_type == 'CREDIT' else -transaction.amount
+        Decimal(transaction['amount']) if transaction['transaction_type'] == 'CREDIT' else -Decimal(transaction['amount'])
         for transaction in transactions
     )
 
@@ -36,10 +36,10 @@ def load_csv_transactions(aadhar_id):
     with open(file_path, 'r') as file:
         reader = csv.DictReader(file)
         for row in reader:
-            if row['AADHAR ID'] == aadhar_id:
+            if row['user'] == aadhar_id:
                 transactions.append({
-                    'date': row['Date'],
-                    'amount': row['Amount'],
-                    'transaction_type': row['Transaction_type']
+                    'date': row['date'],
+                    'amount': row['amount'],
+                    'transaction_type': row['transaction_type']
                 })
     return transactions
