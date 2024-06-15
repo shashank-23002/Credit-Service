@@ -201,26 +201,22 @@ CELERY_TIMEZONE = 'UTC'
 **Method:** GET
 
 **Query Parameters:** loan_id
+
 **Example:** `api/get-statement/?loan_id=1`
 
-**Request JSON:**
+**Response JSON:**
 ```json
 {
     "error": null,
     "past_transactions": [
-        {"date": "2023-01-01", "amount_paid": "420.00"},
+        {"date": "2024-06-14", "amount_paid": "420.00"},
         ...
     ],
     "upcoming_transactions": [
-        {"date": "2023-07-01", "amount_due": "420.00"},
+        {"date": "2024-08-13", "amount_due": "321.85"},
+        {"date": "2024-09-12", "amount_due": "321.85"},
         ...
     ]
 }
 ```
 
-**Response JSON:**
-```json
-{
-    "message": "Payment recorded successfully."
-}
-```
