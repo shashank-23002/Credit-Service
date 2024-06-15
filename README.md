@@ -167,10 +167,10 @@ CELERY_TIMEZONE = 'UTC'
 **Response JSON:**
 ```json
 {
-    "loan_id": 1,
+    "loan_id": 3,
     "due_dates": [
-        {"date": "2023-07-01", "amount_due": "2500.00"},
-        {"date": "2023-08-01", "amount_due": "2500.00"},
+        {"date": "2024-07-14", "amount_due": "338.21"},
+        {"date": "2024-08-14", "amount_due": "338.21"},
     ]
 }
 ```
